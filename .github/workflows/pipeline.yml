@@ -11,7 +11,7 @@ env:
 jobs:
   demonstrando-estrutura:
     name: "Demonstrar estrutura"
-    runs-on: ubuntu-la
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout do Código
@@ -30,7 +30,7 @@ jobs:
           echo "1. name: Nome do workflow"
           echo "2. on: Eventos de trigger (push, workflow_dispatch)"
           echo "3. jobs: Tarefas a executar"
-          
+
       - name: Variáveis e contextos
         run: |
           echo "=== VARIÁVEIS E CONTEXTOS ==="
