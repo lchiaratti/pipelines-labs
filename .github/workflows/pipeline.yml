@@ -1,32 +1,35 @@
-name: Push Trigger Workflow
+name: Issue Trigger Workflow
+# Permissões para permitir comentários automáticos
+permissions:
+  issues: write
 
-### Executa apenas em push
+# Executa quando issues são criadas, editadas ou fechadas
 on:
-  push:
-    branches: 
-      - main
-      - develop
-    paths:
-      - 'src/**' # CRIAR ESSES ARQUIVOS PARA FUNCIONAR
-      - 'README.md' # CRIAR ESSES ARQUIVOS PARA FUNCIONAR
+  issues:
+    types: [opened, edited, closed, labeled]
 
 jobs:
-  push-job:
+  issue-job:
     runs-on: ubuntu-latest
     
     steps:
-    - name: Checkout código
-      uses: actions/checkout@v4
-    
-    - name: Informações do Push
+    - name: Informações da Issue
       run: |
-        echo "Workflow disparado por PUSH"
-        echo "Commit: ${{ github.sha }}"
-        echo "Autor: ${{ github.actor }}"
-        echo "Branch: ${{ github.ref_name }}"
-        echo "Repositório: ${{ github.repository }}"
+        echo "Workflow disparado por ISSUE"
+        echo "Ação: ${{ github.event.action }}"
+        echo "Issue #${{ github.event.issue.number }}"
+        echo "Título: ${{ github.event.issue.title }}"
+        echo "Autor: ${{ github.event.issue.user.login }}"
+        echo "Labels: ${{ join(github.event.issue.labels.*.name, ', ') }}"
     
-    - name: Listar arquivos modificados
-      run: |
-        echo "Arquivos no repositório:"
-        ls -la
+    - name: Resposta automática (nova issue)
+      if: github.event.action == 'opened'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: 'Obrigado por reportar esta issue! Nossa equipe irá analisá-la em breve.'
+          })
