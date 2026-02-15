@@ -1,40 +1,33 @@
-name: "Estrutura de Diretórios e Arquivos"
+name: Schedule Trigger Workflow
 
+## Executa em horários programados (cron)
 on:
-  push:
-    branches: [ main ]
+  schedule:
+    # Executa às 18:42 Brasília (21:42 UTC)
+    - cron: '55 13 * * *'
+  
+  # Permite execução manual para testes
   workflow_dispatch:
 
-env:
-  NODE_VERSION: '18'
-
 jobs:
-  demonstrando-estrutura:
-    name: "Demonstrar estrutura"
+  scheduled-job:
     runs-on: ubuntu-latest
-
+    
     steps:
-      - name: Checkout do Código
-        uses: actions/checkout@v4
-
-      - name: Mostrar estrutura .github/workflows
-        run: |                          
-          echo "=== ESTRUTURA DO DIRETÓRIO .github/workflows ==="
-          ls -la .github/workflows/
-          echo ""
-          echo "Total de workflows: $(ls -1 .github/workflows/*.y*ml 2>/dev/null | wc -l)"
-
-      - name: Elementos obrigatórios do workflow
-        run: |
-          echo "=== ELEMENTOS OBRIGATÓRIOS ==="
-          echo "1. name: Nome do workflow"
-          echo "2. on: Eventos de trigger (push, workflow_dispatch)"
-          echo "3. jobs: Tarefas a executar"
-
-      - name: Variáveis e contextos
-        run: |
-          echo "=== VARIÁVEIS E CONTEXTOS ==="
-          echo "Variável env: ${{ env.NODE_VERSION }}"      # Acessa variável de ambiente
-          echo "Repositório: ${{ github.repository }}"      # Contexto do GitHub
-          echo "Branch: ${{ github.ref_name }}"             # Nome da branch
-          echo "Actor: ${{ github.actor }}"                 # Usuário que executou
+    - name: Checkout código
+      uses: actions/checkout@v4
+    
+    - name: Informações do Schedule
+      run: |
+        echo "Workflow disparado por SCHEDULE"
+        echo "Data atual: $(date)"
+        echo "Hora UTC: $(date -u)"
+        echo "Timezone: $(date +%Z)"
+    
+    - name: Relatório diário automatizado
+      run: |
+        echo "RELATÓRIO DIÁRIO AUTOMATIZADO"
+        echo "================================"
+        echo "Total de commits: $(git rev-list --all --count)"
+        echo "Contribuidores únicos: $(git shortlog -sn | wc -l)"
+        echo "Último commit: $(git log -1 --pretty=format:'%h - %s (%an, %ar)')"
