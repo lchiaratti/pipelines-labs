@@ -1,105 +1,66 @@
-name: Steps Condicionais
+name: Demonstração de Variáveis de Ambiente
 
 on:
   push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+    branches:
+      - main
   workflow_dispatch:
-    inputs:
-      run_tests:
-        description: 'Executar testes?'
-        required: false
-        default: true
-        type: boolean
-      deploy_environment:
-        description: 'Ambiente para deploy'
-        required: false
-        default: 'none'
-        type: choice
-        options:
-        - none
-        - dev
-        - hml
-        - prod
+
+# Variáveis de ambiente no nível do WORKFLOW
+env:
+  WORKFLOW_VAR: "Variável definida no nível do workflow"
+  AMBIENTE: "producao"
+  VERSAO_APP: "1.0.0"
 
 jobs:
-  conditional-steps:
+  demonstracao-variaveis:
     runs-on: ubuntu-latest
-    
+
+    # Variáveis de ambiente no nível do JOB
+    env:
+      JOB_VAR: "Variável definida no nível do job"
+      USUARIO: "devops-user"
+
     steps:
-    - name: Checkout código
-      uses: actions/checkout@v4
-    
-    - name: Step sempre executado
-      run: |
-        echo "Este step sempre executa"
-        echo "Evento: ${{ github.event_name }}"
-        echo "Branch: ${{ github.ref_name }}"
-    
-    - name: Step apenas em push
-      if: github.event_name == 'push'
-      run: |
-        echo "Este step executa apenas em PUSH"
-        echo "Commit: ${{ github.sha }}"
-    
-    - name: Step apenas em PR
-      if: github.event_name == 'pull_request'
-      run: |
-        echo "Este step executa apenas em PULL REQUEST"
-        echo "PR #${{ github.event.number }}"
-    
-    - name: Step apenas na main
-      if: github.ref == 'refs/heads/main'
-      run: |
-        echo "Este step executa apenas na branch MAIN"
-    
-    - name: Executar testes (input manual)
-      if: github.event.inputs.run_tests == 'true' || github.event_name != 'workflow_dispatch'
-      run: |
-        echo "Executando testes..."
-        sleep 2
-        echo "Testes concluídos"
-    
-    - name: Deploy para Development
-      if: github.event.inputs.deploy_environment == 'dev'
-      run: |
-        echo "Deploy para DEVELOPMENT"
-        sleep 1
-        echo "Deploy concluído"
-    
-    - name: Deploy para Staging
-      if: github.event.inputs.deploy_environment == 'hml'
-      run: |
-        echo "Deploy para STAGING"
-        sleep 2
-        echo "Deploy concluído"
-    
-    - name: Deploy para Production
-      if: github.event.inputs.deploy_environment == 'prod'
-      run: |
-        echo "Deploy para PRODUCTION"
-        echo "Aguardando aprovação manual..."
-        sleep 3
-        echo "Deploy concluído"
-    
-    - name: Step com múltiplas condições
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main' && success()
-      run: |
-        echo "Push na main com sucesso nos steps anteriores"
-    
-    - name: Step que executa mesmo com falha
-      if: always()
-      run: |
-        echo "Este step sempre executa, mesmo se houver falhas"
-        echo "Status dos jobs anteriores: ${{ job.status }}"
-    
-    - name: Step apenas se houver falha
-      if: failure()
-      run: |
-        echo "Este step executa apenas se houver falha"
-    
-    - name: Cleanup
-      if: always()
-      run: |
-        echo "Limpeza final sempre executada"
+      - name: Exibir variáveis do workflow
+        run: |
+          echo "=== Variáveis do Workflow ==="
+          echo "Variável WORKFLOW_VAR: ${{ env.WORKFLOW_VAR }}"
+          echo "Ambiente: ${{ env.AMBIENTE }}"
+          echo "Versão da aplicação: ${{ env.VERSAO_APP }}"
+
+      - name: Exibir variáveis do job
+        run: |
+          echo "=== Variáveis do Job ==="
+          echo "Variável JOB_VAR: ${{ env.JOB_VAR }}"
+          echo "Usuário: ${{ env.USUARIO }}"
+
+      - name: Exibir variável do step
+        env:
+          STEP_VAR: "Variável definida no nível do step"
+          MENSAGEM: "Este é um exemplo prático!"
+        run: |
+          echo "=== Variáveis do Step ==="
+          echo "Variável STEP_VAR: ${{ env.STEP_VAR }}"
+          echo "Mensagem: ${{ env.MENSAGEM }}"
+
+      - name: Combinar variáveis de diferentes níveis
+        env:
+          STEP_ESPECIFICO: "step-value"
+        run: |
+          echo "=== Combinação de Variáveis ==="
+          echo "Workflow: ${{ env.WORKFLOW_VAR }}"
+          echo "Job: ${{ env.JOB_VAR }}"
+          echo "Step: ${{ env.STEP_ESPECIFICO }}"
+          echo "Todas acessíveis no mesmo contexto!"
+
+      - name: Usar variáveis em comandos práticos
+        env:
+          NOME_PROJETO: "lab-variaveis"
+          TIMESTAMP: "2025-01-13"
+        run: |
+          echo "=== Exemplo Prático ==="
+          echo "Compilando projeto: ${{ env.NOME_PROJETO }}"
+          echo "Data de build: ${{ env.TIMESTAMP }}"
+          echo "Ambiente de deploy: ${{ env.AMBIENTE }}"
+          echo "Versão: ${{ env.VERSAO_APP }}"
