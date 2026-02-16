@@ -62,21 +62,21 @@ jobs:
         echo "Testes concluídos"
     
     - name: Deploy para Development
-      if: github.event.inputs.deploy_environment == 'development'
+      if: github.event.inputs.deploy_environment == 'dev'
       run: |
         echo "Deploy para DEVELOPMENT"
         sleep 1
         echo "Deploy concluído"
     
     - name: Deploy para Staging
-      if: github.event.inputs.deploy_environment == 'staging'
+      if: github.event.inputs.deploy_environment == 'hml'
       run: |
         echo "Deploy para STAGING"
         sleep 2
         echo "Deploy concluído"
     
     - name: Deploy para Production
-      if: github.event.inputs.deploy_environment == 'production'
+      if: github.event.inputs.deploy_environment == 'prod'
       run: |
         echo "Deploy para PRODUCTION"
         echo "Aguardando aprovação manual..."
