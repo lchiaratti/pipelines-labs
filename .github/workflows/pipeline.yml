@@ -1,70 +1,105 @@
-name: Matrix Strategy
+name: Steps Condicionais
 
 on:
   push:
     branches: [ main ]
+  pull_request:
+    branches: [ main ]
   workflow_dispatch:
+    inputs:
+      run_tests:
+        description: 'Executar testes?'
+        required: false
+        default: true
+        type: boolean
+      deploy_environment:
+        description: 'Ambiente para deploy'
+        required: false
+        default: 'none'
+        type: choice
+        options:
+        - none
+        - dev
+        - hml
+        - prod
 
 jobs:
-  # Job com matrix para múltiplos ambientes
-  test-matrix:
-    runs-on: ${{ matrix.os }}
-    
-    strategy:
-      fail-fast: false  # Não para se um job falhar
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        node-version: [16, 18, 20]
-        include:
-          # Configurações específicas
-          - os: ubuntu-latest
-            node-version: 20
-            experimental: true
-        exclude:
-          # Excluir combinações problemáticas
-          - os: windows-latest
-            node-version: 16
+  conditional-steps:
+    runs-on: ubuntu-latest
     
     steps:
     - name: Checkout código
       uses: actions/checkout@v4
     
-    - name: Informações da matrix
+    - name: Step sempre executado
       run: |
-        echo "OS: ${{ matrix.os }}"
-        echo "Node: ${{ matrix.node-version }}"
-        echo "Experimental: ${{ matrix.experimental }}"
+        echo "Este step sempre executa"
+        echo "Evento: ${{ github.event_name }}"
+        echo "Branch: ${{ github.ref_name }}"
     
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ matrix.node-version }}
-    
-    - name: Verificar versões
+    - name: Step apenas em push
+      if: github.event_name == 'push'
       run: |
-        echo "Node version: $(node --version)"
-        echo "NPM version: $(npm --version)"
+        echo "Este step executa apenas em PUSH"
+        echo "Commit: ${{ github.sha }}"
     
-    - name: Executar testes específicos do OS
+    - name: Step apenas em PR
+      if: github.event_name == 'pull_request'
       run: |
-        echo "Executando testes no ${{ matrix.os }} com Node ${{ matrix.node-version }}..."
+        echo "Este step executa apenas em PULL REQUEST"
+        echo "PR #${{ github.event.number }}"
+    
+    - name: Step apenas na main
+      if: github.ref == 'refs/heads/main'
+      run: |
+        echo "Este step executa apenas na branch MAIN"
+    
+    - name: Executar testes (input manual)
+      if: github.event.inputs.run_tests == 'true' || github.event_name != 'workflow_dispatch'
+      run: |
+        echo "Executando testes..."
         sleep 2
         echo "Testes concluídos"
     
-    - name: Teste experimental
-      if: matrix.experimental == true
+    - name: Deploy para Development
+      if: github.event.inputs.deploy_environment == 'development'
       run: |
-        echo "Executando testes experimentais..."
+        echo "Deploy para DEVELOPMENT"
         sleep 1
-        echo "Testes experimentais concluídos"
-
-  # Job que coleta resultados da matrix
-  collect-results:
-    runs-on: ubuntu-latest
-    needs: test-matrix
+        echo "Deploy concluído"
     
-    steps:
-    - name: Coletar resultados
+    - name: Deploy para Staging
+      if: github.event.inputs.deploy_environment == 'staging'
       run: |
-        echo "Coletando resultados de todos os jobs da matrix..."
-        echo "Todos os testes da matrix foram executados"
+        echo "Deploy para STAGING"
+        sleep 2
+        echo "Deploy concluído"
+    
+    - name: Deploy para Production
+      if: github.event.inputs.deploy_environment == 'production'
+      run: |
+        echo "Deploy para PRODUCTION"
+        echo "Aguardando aprovação manual..."
+        sleep 3
+        echo "Deploy concluído"
+    
+    - name: Step com múltiplas condições
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main' && success()
+      run: |
+        echo "Push na main com sucesso nos steps anteriores"
+    
+    - name: Step que executa mesmo com falha
+      if: always()
+      run: |
+        echo "Este step sempre executa, mesmo se houver falhas"
+        echo "Status dos jobs anteriores: ${{ job.status }}"
+    
+    - name: Step apenas se houver falha
+      if: failure()
+      run: |
+        echo "Este step executa apenas se houver falha"
+    
+    - name: Cleanup
+      if: always()
+      run: |
+        echo "Limpeza final sempre executada"
