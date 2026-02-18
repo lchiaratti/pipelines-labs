@@ -1,93 +1,206 @@
-name: Deploy Multi-Ambientes
+name: Contextos e Expressões
 
 on:
-  workflow_dispatch:  # Permite execução manual para testar cada ambiente
+  push:
+    branches:
+      - main
+      - develop
+      - 'feature/**'
+  pull_request:
+  workflow_dispatch:
 
 jobs:
-  # Job 1: Mostra as variáveis de repositório (compartilhadas)
-  mostrar-variaveis-repositorio:
+  # Job 1: Demonstra contextos github e runner
+  info-contexto:
     runs-on: ubuntu-latest
     steps:
-      - name: Exibir variáveis de repositório
-        run: |
-          echo "=== VARIÁVEIS DE REPOSITÓRIO ==="
-          echo "Aplicação: ${{ vars.APP_NAME }}"
-          echo "Região: ${{ vars.DEFAULT_REGION }}"
-          echo "Timeout padrão: ${{ vars.DEFAULT_TIMEOUT }}"
-          echo "Versão do Node: ${{ vars.NODE_VERSION }}"
+      - name: Checkout código
+        uses: actions/checkout@v4
 
-  # Job 2: Deploy em Desenvolvimento
-  deploy-dev:
+      # Contexto GITHUB - Informações do repositório e evento
+      - name: Exibir contexto GitHub
+        run: |
+          echo "Repositório: ${{ github.repository }}"
+          echo "Ator que disparou: ${{ github.actor }}"
+          echo "Branch/Ref: ${{ github.ref }}"
+          echo "Nome do branch: ${{ github.ref_name }}"
+          echo "Evento: ${{ github.event_name }}"
+          echo "SHA do commit: ${{ github.sha }}"
+          echo "Mensagem do commit: ${{ github.event.head_commit.message }}"
+
+      # Contexto RUNNER - Informações do ambiente de execução
+      - name: Exibir contexto Runner
+        run: |
+          echo "Sistema Operacional: ${{ runner.os }}"
+          echo "Arquitetura: ${{ runner.arch }}"
+          echo "Nome do runner: ${{ runner.name }}"
+          echo "Diretório temporário: ${{ runner.temp }}"
+          echo "Diretório de ferramentas: ${{ runner.tool_cache }}"
+
+      # Dump completo dos contextos para debug
+      - name: Debug - Dump contexto GitHub completo
+        run: echo '${{ toJSON(github) }}'
+
+      - name: Debug - Dump contexto Runner completo
+        run: echo '${{ toJSON(runner) }}'
+
+  # Job 2: Demonstra outputs de steps e referências entre steps
+  outputs-entre-steps:
     runs-on: ubuntu-latest
-    environment: dev  # Usa o environment "dev"
+    outputs:
+      # Exporta output para outros jobs usarem
+      versao: ${{ steps.gerar-versao.outputs.version }}
+      ambiente: ${{ steps.definir-ambiente.outputs.env_name }}
     steps:
-      - name: Configurar ambiente DEV
-        run: |
-          echo "=== DEPLOY EM DESENVOLVIMENTO ==="
-          echo "Aplicação: ${{ vars.APP_NAME }}"
-          echo "Ambiente: ${{ vars.ENVIRONMENT }}"
-          echo "API URL: ${{ vars.API_URL }}"
-          echo "Database: ${{ vars.DATABASE_NAME }}"
-          echo "Região: ${{ vars.DEFAULT_REGION }}"
-          echo "Debug Mode: ${{ vars.DEBUG_MODE }}"
-          echo "Max Connections: ${{ vars.MAX_CONNECTIONS }}"
+      - name: Checkout código
+        uses: actions/checkout@v4
 
-      - name: Simular build para DEV
+      # Step que GERA um output
+      - name: Gerar versão
+        id: gerar-versao
         run: |
-          echo "Compilando aplicação para ${{ vars.ENVIRONMENT }}..."
-          echo "URL de destino: ${{ vars.API_URL }}"
-          sleep 2
-          echo "Build concluído para DEV"
+          VERSION="1.0.${{ github.run_number }}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Versão gerada: $VERSION"
 
-  # Job 3: Deploy em Staging
-  deploy-staging:
+      # Step que GERA outro output
+      - name: Definir ambiente baseado no branch
+        id: definir-ambiente
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            ENV_NAME="production"
+          elif [[ "${{ github.ref }}" == "refs/heads/develop" ]]; then
+            ENV_NAME="staging"
+          else
+            ENV_NAME="development"
+          fi
+          echo "env_name=$ENV_NAME" >> $GITHUB_OUTPUT
+          echo "Ambiente definido: $ENV_NAME"
+
+      # Step que USA outputs de steps anteriores
+      - name: Usar outputs dos steps anteriores
+        run: |
+          echo "Usando versão: ${{ steps.gerar-versao.outputs.version }}"
+          echo "Usando ambiente: ${{ steps.definir-ambiente.outputs.env_name }}"
+          echo "Tag completa: ${{ steps.definir-ambiente.outputs.env_name }}-v${{ steps.gerar-versao.outputs.version }}"
+
+  # Job 3: Demonstra expressões e funções
+  expressoes-e-funcoes:
     runs-on: ubuntu-latest
-    environment: staging  # Usa o environment "staging"
-    needs: deploy-dev     # Só executa após deploy-dev
+    # Usa output do job anterior
+    needs: outputs-entre-steps
     steps:
-      - name: Configurar ambiente STAGING
-        run: |
-          echo "=== DEPLOY EM STAGING ==="
-          echo "Aplicação: ${{ vars.APP_NAME }}"
-          echo "Ambiente: ${{ vars.ENVIRONMENT }}"
-          echo "API URL: ${{ vars.API_URL }}"
-          echo "Database: ${{ vars.DATABASE_NAME }}"
-          echo "Região: ${{ vars.DEFAULT_REGION }}"
-          echo "Debug Mode: ${{ vars.DEBUG_MODE }}"
-          echo "Max Connections: ${{ vars.MAX_CONNECTIONS }}"
+      - name: Checkout código
+        uses: actions/checkout@v4
 
-      - name: Simular testes de integração
-        run: |
-          echo "Executando testes em ${{ vars.ENVIRONMENT }}..."
-          echo "Endpoint: ${{ vars.API_URL }}/health"
-          sleep 2
-          echo "Testes aprovados em STAGING"
+      # Função contains() - Verifica se string contém texto
+      - name: Verificar se é hotfix
+        if: contains(github.ref, 'hotfix')
+        run: echo "Este é um branch de HOTFIX - processo especial ativado!"
 
-  # Job 4: Deploy em Produção
-  deploy-production:
+      # Função startsWith() - Verifica início da string
+      - name: Ação apenas para feature branches
+        if: startsWith(github.ref, 'refs/heads/feature/')
+        run: |
+          echo "Branch de feature detectado: ${{ github.ref_name }}"
+
+      # Função endsWith() - Verifica fim da string
+      - name: Verificar se commit termina com número
+        run: |
+          if [[ "${{ endsWith(github.sha, '0') }}" == "true" ]]; then
+            echo "SHA termina com zero!"
+          else
+            echo "SHA: ${{ github.sha }}"
+          fi
+
+      # Função format() - Formata strings dinamicamente
+      - name: Criar mensagem formatada
+        run: |
+          MESSAGE="${{ format('Deploy da versão {0} para {1} por {2}', needs.outputs-entre-steps.outputs.versao, needs.outputs-entre-steps.outputs.ambiente, github.actor) }}"
+          echo "$MESSAGE"
+
+      # Expressão complexa com múltiplas condições
+      - name: Deploy condicional
+        if: |
+          github.event_name == 'push' &&
+          (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+        run: |
+          echo "Executando deploy automático..."
+          echo "Versão: ${{ needs.outputs-entre-steps.outputs.versao }}"
+          echo "Ambiente: ${{ needs.outputs-entre-steps.outputs.ambiente }}"
+
+  # Job 4: Demonstra contexto JOB e verificação de status
+  verificar-status:
     runs-on: ubuntu-latest
-    environment: production  # Usa o environment "production"
-    needs: deploy-staging    # Só executa após deploy-staging
+    needs: [info-contexto, outputs-entre-steps, expressoes-e-funcoes]
+    if: always() # Sempre executa, mesmo se jobs anteriores falhem
     steps:
-      - name: Configurar ambiente PRODUCTION
+      - name: Verificar status dos jobs anteriores
         run: |
-          echo "=== DEPLOY EM PRODUÇÃO ==="
-          echo "Aplicação: ${{ vars.APP_NAME }}"
-          echo "Ambiente: ${{ vars.ENVIRONMENT }}"
-          echo "API URL: ${{ vars.API_URL }}"
-          echo "Database: ${{ vars.DATABASE_NAME }}"
-          echo "Região: ${{ vars.DEFAULT_REGION }}"
-          echo "Debug Mode: ${{ vars.DEBUG_MODE }}"
-          echo "Max Connections: ${{ vars.MAX_CONNECTIONS }}"
+          echo "Status do job atual: ${{ job.status }}"
+          echo "Analisando jobs anteriores..."
 
-      - name: Deploy em produção
-        run: |
-          echo "Realizando deploy em ${{ vars.ENVIRONMENT }}..."
-          echo "URL pública: ${{ vars.API_URL }}"
-          sleep 3
-          echo "Deploy em PRODUÇÃO concluído com sucesso!"
+          # Verifica resultado do needs
+          if [[ "${{ needs.info-contexto.result }}" == "success" ]]; then
+            echo "info-contexto: SUCESSO"
+          else
+            echo "info-contexto: FALHOU"
+          fi
 
-      - name: Notificar equipe
+          if [[ "${{ needs.outputs-entre-steps.result }}" == "success" ]]; then
+            echo "outputs-entre-steps: SUCESSO"
+          else
+            echo "outputs-entre-steps: FALHOU"
+          fi
+
+          if [[ "${{ needs.expressoes-e-funcoes.result }}" == "success" ]]; then
+            echo "expressoes-e-funcoes: SUCESSO"
+          else
+            echo "expressoes-e-funcoes: FALHOU"
+          fi
+
+      # Ação condicional baseada em sucesso de todos os jobs
+      - name: Notificar sucesso total
+        if: |
+          needs.info-contexto.result == 'success' &&
+          needs.outputs-entre-steps.result == 'success' &&
+          needs.expressoes-e-funcoes.result == 'success'
+        run: echo "Todos os jobs executaram com SUCESSO!"
+
+      # Ação condicional se algum job falhou
+      - name: Notificar falha
+        if: |
+          needs.info-contexto.result == 'failure' ||
+          needs.outputs-entre-steps.result == 'failure' ||
+          needs.expressoes-e-funcoes.result == 'failure'
         run: |
-          echo "Enviando notificação de deploy para ${{ vars.API_URL }}"
-          echo "Versão implantada: ${{ vars.APP_NAME }} em ${{ vars.ENVIRONMENT }}"
+          echo "Pelo menos um job FALHOU!"
+          echo "Verifique os logs acima para mais detalhes."
+
+  # Job 5: Caso de uso prático - Nomear artefatos dinamicamente
+  criar-artefato-dinamico:
+    runs-on: ubuntu-latest
+    needs: outputs-entre-steps
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Criar arquivo de build simulado
+        run: |
+          mkdir -p build
+          echo "Build info" > build/info.txt
+          echo "Versão: ${{ needs.outputs-entre-steps.outputs.versao }}" >> build/info.txt
+          echo "Ambiente: ${{ needs.outputs-entre-steps.outputs.ambiente }}" >> build/info.txt
+          echo "Branch: ${{ github.ref_name }}" >> build/info.txt
+          echo "Commit: ${{ github.sha }}" >> build/info.txt
+          echo "Actor: ${{ github.actor }}" >> build/info.txt
+          cat build/info.txt
+
+      # Nome do artefato usa expressões para ser dinâmico
+      - name: Upload artefato com nome dinâmico
+        uses: actions/upload-artifact@v4
+        with:
+          # Nome formatado dinamicamente: app-production-v1.0.123-abc1234
+          name: ${{ format('app-{0}-v{1}-{2}', needs.outputs-entre-steps.outputs.ambiente, needs.outputs-entre-steps.outputs.versao, github.sha) }}
+          path: build/
+          retention-days: 5
