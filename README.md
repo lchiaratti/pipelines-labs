@@ -2,4 +2,4 @@
 
 * Estudo com pipelines no GitHub Actions
 
-## Teste PR
+## Teste Pipeline Python
