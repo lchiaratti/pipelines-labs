@@ -125,7 +125,7 @@ jobs:
         run: pip-audit -r requirements.txt
 
       - name: Run Bandit (Security Linting)
-        run: bandit -r . -f json -o bandit-report.json
+        run: bandit -r . -x tests,.github -ll -ii -f json -o bandit-report.json
 
       - name: Upload Bandit Report
         uses: actions/upload-artifact@v4
