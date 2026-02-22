@@ -7,6 +7,13 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   PYTHON_VERSION: '3.11'
   NODE_VERSION: '18'
@@ -16,17 +23,18 @@ jobs:
   lint:
     name: Lint and Code Quality
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v5.3.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Cache dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v4.2.2
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
@@ -46,28 +54,29 @@ jobs:
         run: isort --profile black --check-only --diff .
 
       - name: Run Flake8 (Linting)
-        run: flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        run: flake8 . --count --show-source --statistics --max-line-length=88 --extend-ignore=E203,W503
 
   # Unit Tests
   test:
     name: Unit Tests
     runs-on: ubuntu-latest
     needs: lint
+    timeout-minutes: 20
     strategy:
       matrix:
         python-version: ['3.9', '3.10', '3.11']
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v5.3.0
         with:
           python-version: ${{ matrix.python-version }}
 
       - name: Cache dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v4.2.2
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('**/requirements.txt') }}
@@ -85,7 +94,7 @@ jobs:
 
       - name: Upload coverage to Codecov
         if: matrix.python-version == '3.11'
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v4.6.0
         with:
           file: ./coverage.xml
           flags: unittests
@@ -96,29 +105,30 @@ jobs:
     name: Security Scan
     runs-on: ubuntu-latest
     needs: lint
+    timeout-minutes: 10
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v5.3.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install safety bandit
+          pip install pip-audit bandit
           pip install -r requirements.txt
 
-      - name: Run Safety (Dependency Vulnerability Check)
-        run: safety check
+      - name: Run pip-audit (Dependency Vulnerability Check)
+        run: pip-audit -r requirements.txt
 
       - name: Run Bandit (Security Linting)
-        run: bandit -r . -f json -o bandit-report.json || true
+        run: bandit -r . -f json -o bandit-report.json
 
       - name: Upload Bandit Report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.1
         if: always()
         with:
           name: bandit-report
@@ -129,27 +139,28 @@ jobs:
     name: Build Docker Image
     runs-on: ubuntu-latest
     needs: [test, security]
+    timeout-minutes: 25
     outputs:
       image-tag: ${{ secrets.DOCKERHUB_USERNAME }}/task-manager:sha-${{ github.sha }}
       image-digest: ${{ steps.build.outputs.digest }}
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v3.8.0
 
       - name: Log in to Docker Hub
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@v3
+        uses: docker/login-action@v3.3.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Extract metadata
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v5.6.1
         with:
           images: ${{ secrets.DOCKERHUB_USERNAME }}/task-manager
           tags: |
@@ -160,7 +171,7 @@ jobs:
 
       - name: Build and push Docker image
         id: build
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v5.4.0
         with:
           context: .
           platforms: linux/amd64,linux/arm64
@@ -176,19 +187,25 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     if: github.event_name != 'pull_request'
+    timeout-minutes: 15
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
 
-      - name: Build local Docker image for testing
-        run: |
-          docker build -t local-task-manager:test .
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3.3.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Pull Docker image for testing
+        run: docker pull ${{ needs.build.outputs.image-tag }}
 
       - name: Start application container
         run: |
           docker run -d -p 8000:8000 --name integration-test-app \
-            local-task-manager:test
+            ${{ needs.build.outputs.image-tag }}
 
       - name: Wait for application to be ready
         run: |
@@ -230,21 +247,22 @@ jobs:
 
       - name: Cleanup integration test container
         if: always()
-        run: docker stop integration-test-app && docker rm integration-test-app
+        run: docker rm -f integration-test-app || true
 
   # Performance Tests
   performance-test:
     name: Performance Tests
     runs-on: ubuntu-latest
-    needs: integration-test
+    needs: [build, integration-test]
     if: github.event_name != 'pull_request'
+    timeout-minutes: 20
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v5.3.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -252,15 +270,20 @@ jobs:
         run: |
           pip install locust
 
-      - name: Build local Docker image for testing
-        run: |
-          docker build -t local-task-manager:test .
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3.3.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Pull Docker image for testing
+        run: docker pull ${{ needs.build.outputs.image-tag }}
 
       - name: Run performance tests
         run: |
           # Start the application in background
           docker run -d -p 8000:8000 --name perf-test-app \
-            local-task-manager:test
+            ${{ needs.build.outputs.image-tag }}
 
           # Wait for app to be ready
           timeout 60 bash -c 'until curl -f http://localhost:8000/api/health; do sleep 2; done'
@@ -276,14 +299,15 @@ jobs:
 
       - name: Cleanup
         if: always()
-        run: docker stop perf-test-app && docker rm perf-test-app
+        run: docker rm -f perf-test-app || true
 
   # Deploy to staging
   deploy-staging:
     name: Deploy to Staging
     runs-on: ubuntu-latest
-    needs: [integration-test, performance-test]
+    needs: [build, integration-test, performance-test]
     if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    timeout-minutes: 10
     environment:
       name: staging
       url: https://task-manager-staging.example.com
@@ -299,8 +323,9 @@ jobs:
   deploy-production:
     name: Deploy to Production
     runs-on: ubuntu-latest
-    needs: [integration-test, performance-test]
+    needs: [build, integration-test, performance-test]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    timeout-minutes: 10
     environment:
       name: production
       url: https://task-manager.example.com
@@ -318,6 +343,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [deploy-staging, deploy-production]
     if: always() && (needs.deploy-staging.result != 'skipped' || needs.deploy-production.result != 'skipped')
+    timeout-minutes: 5
 
     steps:
       - name: Notify success
