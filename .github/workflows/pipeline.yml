@@ -141,7 +141,7 @@ jobs:
     needs: [test, security]
     timeout-minutes: 25
     outputs:
-      image-tag: ${{ secrets.DOCKERHUB_USERNAME }}/task-manager:sha-${{ github.sha }}
+      image-tag: ${{ steps.image_tag.outputs.value }}
       image-digest: ${{ steps.build.outputs.digest }}
 
     steps:
@@ -168,6 +168,10 @@ jobs:
             type=ref,event=pr
             type=sha,prefix=sha-
             type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Define image tag output
+        id: image_tag
+        run: echo "value=${{ secrets.DOCKERHUB_USERNAME }}/task-manager:sha-${{ github.sha }}" >> "$GITHUB_OUTPUT"
 
       - name: Build and push Docker image
         id: build
@@ -200,7 +204,9 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Pull Docker image for testing
-        run: docker pull ${{ needs.build.outputs.image-tag }}
+        run: |
+          test -n "${{ needs.build.outputs.image-tag }}"
+          docker pull ${{ needs.build.outputs.image-tag }}
 
       - name: Start application container
         run: |
@@ -277,7 +283,9 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Pull Docker image for testing
-        run: docker pull ${{ needs.build.outputs.image-tag }}
+        run: |
+          test -n "${{ needs.build.outputs.image-tag }}"
+          docker pull ${{ needs.build.outputs.image-tag }}
 
       - name: Run performance tests
         run: |
