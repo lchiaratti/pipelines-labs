@@ -1,5 +1,3 @@
-import json
-
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -57,7 +55,7 @@ class TestTaskCRUD:
         assert data["title"] == task_data["title"]
         assert data["description"] == task_data["description"]
         assert data["priority"] == task_data["priority"]
-        assert data["completed"] == False
+        assert data["completed"] is False
         assert "id" in data
         assert "created_at" in data
 
@@ -69,7 +67,7 @@ class TestTaskCRUD:
         data = response.json()
         assert data["title"] == task_data["title"]
         assert data["priority"] == "medium"  # default value
-        assert data["completed"] == False
+        assert data["completed"] is False
 
     def test_get_empty_tasks(self, client):
         response = client.get("/api/tasks")
@@ -146,7 +144,7 @@ class TestTaskCRUD:
         data = response.json()
         assert data["title"] == original_data["title"]  # unchanged
         assert data["priority"] == original_data["priority"]  # unchanged
-        assert data["completed"] == True  # changed
+        assert data["completed"] is True  # changed
 
     def test_update_nonexistent_task(self, client):
         update_data = {"title": "Updated Task"}
@@ -235,7 +233,7 @@ class TestTaskFiltering:
         filtered_tasks = response.json()
         assert len(filtered_tasks) == 1
         assert filtered_tasks[0]["priority"] == "high"
-        assert filtered_tasks[0]["completed"] == True
+        assert filtered_tasks[0]["completed"] is True
 
     def test_pagination(self, client):
         self.setup_tasks(client)

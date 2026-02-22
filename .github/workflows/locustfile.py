@@ -1,4 +1,3 @@
-import json
 import random
 
 from locust import HttpUser, between, task
@@ -37,7 +36,10 @@ class TaskManagerUser(HttpUser):
         priorities = ["low", "medium", "high"]
         task_data = {
             "title": f"Load Test Task {random.randint(1000, 9999)}",
-            "description": f"This is a task created during load testing at {random.randint(1, 100)}%",
+            "description": (
+                "This is a task created during load testing at "
+                f"{random.randint(1, 100)}%"
+            ),
             "priority": random.choice(priorities),
         }
 

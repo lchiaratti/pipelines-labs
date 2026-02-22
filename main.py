@@ -1,4 +1,3 @@
-import os
 from datetime import datetime, timezone
 from typing import List, Optional
 
@@ -168,7 +167,7 @@ async def delete_task(task_id: int, db: Session = Depends(get_db)):
 @app.get("/api/stats", response_model=TaskStats)
 async def get_stats(db: Session = Depends(get_db)):
     total = db.query(TaskDB).count()
-    completed = db.query(TaskDB).filter(TaskDB.completed == True).count()
+    completed = db.query(TaskDB).filter(TaskDB.completed.is_(True)).count()
     pending = total - completed
     high_priority = db.query(TaskDB).filter(TaskDB.priority == "high").count()
 
