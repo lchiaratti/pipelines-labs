@@ -141,7 +141,7 @@ jobs:
     needs: [test, security]
     timeout-minutes: 25
     outputs:
-      image-tag: ${{ steps.image_tag.outputs.value }}
+      image_tag: ${{ steps.image_tag.outputs.value }}
       image-digest: ${{ steps.build.outputs.digest }}
 
     steps:
@@ -205,13 +205,13 @@ jobs:
 
       - name: Pull Docker image for testing
         run: |
-          test -n "${{ needs.build.outputs.image-tag }}"
-          docker pull ${{ needs.build.outputs.image-tag }}
+          test -n "${{ needs.build.outputs.image_tag }}"
+          docker pull ${{ needs.build.outputs.image_tag }}
 
       - name: Start application container
         run: |
           docker run -d -p 8000:8000 --name integration-test-app \
-            ${{ needs.build.outputs.image-tag }}
+            ${{ needs.build.outputs.image_tag }}
 
       - name: Wait for application to be ready
         run: |
@@ -284,14 +284,14 @@ jobs:
 
       - name: Pull Docker image for testing
         run: |
-          test -n "${{ needs.build.outputs.image-tag }}"
-          docker pull ${{ needs.build.outputs.image-tag }}
+          test -n "${{ needs.build.outputs.image_tag }}"
+          docker pull ${{ needs.build.outputs.image_tag }}
 
       - name: Run performance tests
         run: |
           # Start the application in background
           docker run -d -p 8000:8000 --name perf-test-app \
-            ${{ needs.build.outputs.image-tag }}
+            ${{ needs.build.outputs.image_tag }}
 
           # Wait for app to be ready
           timeout 60 bash -c 'until curl -f http://localhost:8000/api/health; do sleep 2; done'
@@ -324,7 +324,7 @@ jobs:
       - name: Deploy to staging
         run: |
           echo "Deploying to staging environment..."
-          echo "Image: ${{ needs.build.outputs.image-tag }}"
+          echo "Image: ${{ needs.build.outputs.image_tag }}"
           # Add your staging deployment logic here
 
   # Deploy to production
@@ -342,7 +342,7 @@ jobs:
       - name: Deploy to production
         run: |
           echo "Deploying to production environment..."
-          echo "Image: ${{ needs.build.outputs.image-tag }}"
+          echo "Image: ${{ needs.build.outputs.image_tag }}"
           # Add your production deployment logic here
 
   # Notification
